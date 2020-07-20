@@ -49,6 +49,7 @@ def inversion_more_backspace(s_left, n_backspace, s_right):
 def keys_around_backspace(s):
     #TODO : improve it to check if there is an error anywhere in the deleted text (right now we only look at the last letter)
     # check distance betweeen the deleted word and the replaced word : if it's too big doesn't count. And look at all the diff
+    #TODO : take into account clicks
 
     match_1_backspace = re.findall("([^\>])\<\[[^\]]*Backspace\]\>([^\<]+)(?:\<|\Z)", s) # match jfksdfj<[Backspace]>jdskjd and return the erased letter and the replacement text
     match_more_backpace = re.findall("(?:\A|\>)([^\>]+)\<\[[^\]]*Backspace\]x(\d*)\>([^\<]+)(?:\<|\Z)", s)# match dfdfkl<[Backspace]x2>kjkfkdjf etc. and return the erased letter and the replacement text
@@ -107,13 +108,14 @@ if __name__ == """__main__""":
 
 
     print("{} unnecessary backspace".format(n_unnecessary))
-    print("{} inverted letters".format(len(l_inversion)))
+    print("{} inverted letters (ts instead os st)".format(len(l_inversion)))
     print("{} deleted letters (excluding unnecessary backspace and inversions)".format(len(l_deleted)))
-    print("most deleted keys: ")
-    print(sorted_unique(l_deleted))
-    print("most replaced keys: ")
+    print
+    print("most missed keys (excluding inversions): ")
     print(sorted_unique(l_replaced))
-    print("most coupled keys: ")
+    print
+    print("the keys you most type instead of another (excluding inversions): ")
     print(sorted_unique(l_coupled))
-    print("most inverted keys: ")
+    print
+    print("the keys you most invert (ts instead of st): ")
     print(sorted_unique(l_inversion))
