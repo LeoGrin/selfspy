@@ -195,16 +195,17 @@ Selfstats is a swiss army knife of self knowledge. Experiment with it when you h
 
 ### Selfstats Reference
 
-The --help is a beast that right now looks something like this:
+The --help (updated for this fork) is a beast that right now looks something like this:
 
 ```
 usage: selfstats [-h] [-c FILE] [-p PASSWORD] [-d DATA_DIR] [-s]
-                    [-D DATE [DATE ...]] [-C CLOCK] [-i ID]
-                    [-b BACK [BACK ...]] [-l LIMIT [LIMIT ...]] [-m nr]
-                    [-T regexp] [-P regexp] [-B regexp] [--ratios] [--clicks]
-                    [--key-freqs] [--human-readable] [--active [seconds]] [--periods [seconds]]
-                    [--pactive [seconds]] [--tactive [seconds]] [--pkeys]
-                    [--tkeys]
+                 [-D DATE [DATE ...]] [-C CLOCK] [-i ID] [-b BACK [BACK ...]]
+                 [-l LIMIT [LIMIT ...]] [-m nr] [-T regexp] [-P regexp]
+                 [-B regexp] [--clicks] [--key-freqs] [--human-readable]
+                 [--active [seconds]] [--ratios [seconds]]
+                 [--periods [seconds]] [--pactive [seconds]]
+                 [--tactive [seconds]] [--pkeys] [--tkeys] [--export-text]
+                 [--typing-speed] [--typing-quality]
 
 Calculate statistics on selfspy data. Per default it will show non-text
 information that matches the filter. Adding '-s' means also show text. Adding
@@ -276,8 +277,8 @@ optional arguments:
   -m nr, --min-keys nr  Only allow entries with at least <nr> keystrokes
   -T regexp, --title regexp
                         Only allow entries where a search for this <regexp> in
-                        the window title matches something. All regular expressions
-                        are case insensitive.
+                        the window title matches something. All regular
+                        expressions are case insensitive.
   -P regexp, --process regexp
                         Only allow entries where a search for this <regexp> in
                         the process matches something.
@@ -309,6 +310,11 @@ optional arguments:
                         them. Optional argument works same as for --active.
   --pkeys               List processes sorted by number of keystrokes.
   --tkeys               List window titles sorted by number of keystrokes.
+  --export-text         Export the text db to a csv for further analysis
+  --typing-speed        Display typing speed (useful in combination with
+                        dates)
+  --typing-quality      Display typing quality, i.e number of errors and show
+                        worst keys
 
 See the README file or http://gurgeh.github.com/selfspy for examples.
 ```
