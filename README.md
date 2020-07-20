@@ -1,5 +1,7 @@
 ## Why this fork?
-This fork focuses on automatically evaluating typing quality. This can be used for two reasons: improving typing quality, by having access to your weakest keys and other useful statistics, and providing an automatic Quantified Self measure, which can be correlated with the covariates of your choice.
+This fork focuses on automatically evaluating typing quality. This can be used for two reasons: 
+- improving typing quality, by having access to your weakest keys and other useful statistics.
+- providing an automatic Quantified Self measure, which can be correlated with the covariates of your choice.
 
 ## README from [original selfspy](https://github.com/selfspy/selfspy)
 ### What is selfspy? 
