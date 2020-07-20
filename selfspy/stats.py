@@ -38,9 +38,10 @@ from selfspy.password_dialog import get_password
 from selfspy.period import Period
 
 from selfspy import models
-from selfspy import useful_functions
 import pandas as pd
 import numpy as np
+import selfspy.key_analysis as key_analysis
+
 
 import codecs
 sys.stdout = codecs.getwriter('utf8')(sys.stdout)
@@ -48,7 +49,7 @@ sys.stdout = codecs.getwriter('utf8')(sys.stdout)
 ACTIVE_SECONDS = 180
 PERIOD_LOOKUP = {'s': 'seconds', 'm': 'minutes', 'h': 'hours', 'd': 'days', 'w': 'weeks'}
 ACTIVITY_ACTIONS = {'active', 'periods', 'pactive', 'tactive', 'ratios'}
-SUMMARY_ACTIONS = ACTIVITY_ACTIONS.union({'pkeys', 'tkeys', 'key_freqs', 'clicks', 'ratios', 'typing_speed'})
+SUMMARY_ACTIONS = ACTIVITY_ACTIONS.union({'pkeys', 'tkeys', 'key_freqs', 'clicks', 'ratios', 'typing_speed', 'typing_quality'})
 
 PROCESS_ACTIONS = {'pkeys', 'pactive'}
 WINDOW_ACTIONS = {'tkeys', 'tactive'}
@@ -239,6 +240,8 @@ class Selfstats:
             self.need_timings = True
         if self.args['key_freqs']:
             self.need_keys = True
+        if self.args['typing_quality']:
+            self.need_keys = True # we need to access the keys
         if self.args['human_readable']:
             self.need_humanreadable = True
 
@@ -394,6 +397,10 @@ class Selfstats:
         timings = []
         typing_speeds = []
         keys = Counter()
+        # for evaluating typing qual
+        typing_quality_dic = key_analysis.create_dic()
+
+
         for row in self.filter_keys():
             d = {'nr': 1,
                  'keystrokes': len(row.load_timings())}
@@ -410,6 +417,9 @@ class Selfstats:
                 keys.update(row.decrypt_keys())
             if self.args['typing_speed']:
                 typing_speeds.append(row.nrkeys / (row.created_at - row.started).total_seconds())
+            if self.args['typing_quality']:
+                key_analysis.update_dic(typing_quality_dic, row.decrypt_text().decode('utf8'))
+
 
         for click in self.filter_clicks():
             d = {'noscroll_clicks': click.button not in [4, 5],
@@ -431,6 +441,8 @@ class Selfstats:
             self.summary['key_freqs'] = keys
         if self.args['typing_speed']:
             self.summary["typing_speeds"] = typing_speeds
+        if self.args['typing_quality']:
+            self.summary["typing_quality"] = typing_quality_dic
 
     def show_summary(self):
         print '%d keystrokes in %d key sequences,' % (self.summary.get('keystrokes', 0), self.summary.get('nr', 0)),
@@ -468,6 +480,9 @@ class Selfstats:
             print(np.mean(self.summary["typing_speeds"]))
             print("std speed:")
             print(np.std(self.summary["typing_speeds"]))
+
+        if self.args["typing_quality"]:
+            key_analysis.display_typing_quality(self.summary["typing_quality"])
 
         if self.args['pkeys']:
             print 'Processes sorted by keystrokes:'
@@ -588,6 +603,7 @@ def parse_config():
     parser.add_argument('--tkeys', action='store_true', help='List window titles sorted by number of keystrokes.')
     parser.add_argument('--export-text', action='store_true', help='Export the text db to a csv for further analysis')
     parser.add_argument('--typing-speed', action='store_true', help='Display typing speed (useful in combination with dates)')
+    parser.add_argument('--typing-quality', action='store_true',help='Display typing quality, i.e number of errors and show worst keys')
 
     return parser.parse_args()
 
