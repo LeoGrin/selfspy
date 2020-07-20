@@ -1,4 +1,8 @@
-### What is this?
+## Why this fork?
+This fork focuses on automatically evaluating typing quality. This can be used for two reasons: improving typing quality, by having access to your weakest keys and other useful statistics, and providing an automatic Quantified Self measure, which can be correlated with the covariates of your choice.
+
+## README from [original selfspy](https://github.com/selfspy/selfspy)
+### What is selfspy? 
 Selfspy is a daemon for Unix/X11, (thanks to @ljos!) Mac OS X and (thanks to @Foxboron) Windows, that continuously monitors and stores what you are doing on your computer. This way, you can get all sorts of nifty statistics and reminders on what you have been up to. It is inspired by the [Quantified Self](http://en.wikipedia.org/wiki/Quantified_Self)-movement and [Stephen Wolfram's personal key logging](http://blog.stephenwolfram.com/2012/03/the-personal-analytics-of-my-life/).
 
 See Example Statistics, below, for some of the fabulous things you can do with this data.
