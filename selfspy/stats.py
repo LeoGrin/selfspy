@@ -241,6 +241,7 @@ class Selfstats:
         if self.args['key_freqs']:
             self.need_keys = True
         if self.args['typing_quality']:
+            self.args['key_freqs'] = True # to compute key freqs # TODO : would it be better to compute the key freqs directly in the typing quality functions ??
             self.need_keys = True # we need to access the keys
         if self.args['human_readable']:
             self.need_humanreadable = True
@@ -467,7 +468,7 @@ class Selfstats:
                 print self.summary.get(key, 0), name
             print
 
-        if self.args['key_freqs']:
+        if self.args['key_freqs'] and not self.args['typing_quality']:
             print 'Key frequencies:'
             for key, val in self.summary['key_freqs'].most_common():
                 print key, val
@@ -482,7 +483,7 @@ class Selfstats:
             print(np.std(self.summary["typing_speeds"]))
 
         if self.args["typing_quality"]:
-            key_analysis.display_typing_quality(self.summary["typing_quality"])
+            key_analysis.display_typing_quality(self.summary["typing_quality"], keys_freq = self.summary['key_freqs'])
 
         if self.args['pkeys']:
             print 'Processes sorted by keystrokes:'
