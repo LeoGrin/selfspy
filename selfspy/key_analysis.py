@@ -52,7 +52,7 @@ def sorted_unique_rates(array, n, dic_counts):
     :param array: array to analyse
     :param n: number of results
     :param dic_freq: dictionnary containing the base count of the elements of the array
-    :return:
+    :return: top n letters, top n rates
     """
     n = min(n, len(array))
     ar, count = np.unique(array, return_counts=True)
@@ -60,6 +60,19 @@ def sorted_unique_rates(array, n, dic_counts):
     indices = np.argsort(-rates)
     return ar[indices][:n], rates[indices][:n]
 
+def sorted_unique_rates_coupled(array, n, dic_counts):
+    """
+
+    :param array: array of string char1char2 where char1 has been typed instead of char2
+    :param n: number of results to display
+    :param dic_counts: frequency of characters in the whole db
+    :return: top n couples, top n rates
+    """
+    n = min(n, len(array))
+    ar, count = np.unique(array, return_counts=True)
+    rates = np.array([float(count[i]) / dic_counts[ar[i][1]] for i in range(len(count)) if len(ar[i]) > 1 and dic_counts[ar[i][1]] > 0]) # TODO the conditions should'nt be necessaary
+    indices = np.argsort(-rates)
+    return ar[indices][:n], rates[indices][:n]
 
 def display_typing_quality(dic, n=15, keys_freq = None):
     """
@@ -85,9 +98,14 @@ def display_typing_quality(dic, n=15, keys_freq = None):
 
     print
     print("Keys you most type instead of another (excluding inversions): ")
-    keys, counts = sorted_unique(dic["l_coupled"], n)
-    for i in range(len(keys)):
-        print(u"Keys : {} instead of {} ({} times)".format(keys[i][0], keys[i][1], counts[i]))
+    if not keys_freq:
+        keys, counts = sorted_unique(dic["l_coupled"], n)
+        for i in range(len(keys)):
+            print(u"Keys : {} instead of {} ({} times)".format(keys[i][0], keys[i][1], counts[i]))
+    else:
+        keys, rates = sorted_unique_rates_coupled(dic["l_coupled"], n, keys_freq)
+        for i in range(len(keys)):
+            print("Keys : {} instead of {} ({}%)".format(keys[i][0], keys[i][1], int(rates[i] * 100)))
     print
     print("Keys you most invert (e.g ts instead of st): ")
     keys, counts = sorted_unique(dic["l_inversion"], n)
@@ -158,7 +176,8 @@ def keys_around_backspace(s):
                 l_deleted.append(key_deleted)
                 if len(key_replaced) >= 1:
                     l_correct.append(key_replaced)
-                    l_coupled.append(key_deleted + key_replaced)
+                    if len(key_deleted) >= 1:
+                        l_coupled.append(key_deleted + key_replaced)
 
     if match_more_backpace:
         for group in match_more_backpace:
@@ -177,7 +196,8 @@ def keys_around_backspace(s):
                     l_deleted.append(key_deleted)
                     if len(key_replaced) >= 1:
                         l_correct.append(key_replaced)
-                        l_coupled.append(key_deleted + key_replaced)
+                        if len(key_deleted) >= 1:
+                            l_coupled.append(key_deleted + key_replaced)
 
     return l_deleted, l_correct, l_coupled, l_inversion, n_unnecessary
 
