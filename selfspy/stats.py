@@ -241,7 +241,6 @@ class Selfstats:
         if self.args['key_freqs']:
             self.need_keys = True
         if self.args['typing_quality']:
-            self.args['key_freqs'] = True # to compute key freqs # TODO : would it be better to compute the key freqs directly in the typing quality functions ??
             self.need_keys = True # we need to access the keys
         if self.args['human_readable']:
             self.need_humanreadable = True
@@ -348,7 +347,9 @@ class Selfstats:
             print row.id, row.started, pretty_seconds((row.created_at - row.started).total_seconds()), row.process.name, '"%s"' % row.window.title, row.nrkeys,
             if self.args['showtext']:
                 if self.need_humanreadable:
-                    print row.decrypt_humanreadable().decode('utf8')
+                    # TODO : I don't think the errors = replace is a good solution. There must be an encoding pb
+                    #print row.decrypt_humanreadable()
+                    print row.decrypt_humanreadable().decode('utf8', errors = "replace")
                 else:
                     print row.decrypt_text().decode('utf8')
             else:
@@ -356,8 +357,8 @@ class Selfstats:
         print rows, 'rows'
 
 
-    def export_text_to_csv(self, filename = "selfspy_df.csv"):
-        #TODO : add hr text by solving the issue with hr
+    def export_text_to_csv(self, filename = "./selfspy_df.csv"):
+        # TODO : I don't think the errors = replace is a good solution. There must be an encoding pb
         print "exporting text db to csv...."
         fkeys = self.filter_keys()
         df_text = pd.DataFrame(columns = ["process_name", "window_title", "nr_keys", "start_time", "length_time", "text"])
@@ -368,9 +369,10 @@ class Selfstats:
                 "nr_keys" : row.nrkeys,
                 "start_time" : row.started,
                 "length_time" : row.created_at - row.started,
-                "text" : row.decrypt_text().decode('utf8')
+                "text" : row.decrypt_text().decode('utf8', errors = "replace"),
+                "hr_text" : row.decrypt_humanreadable().decode('utf8', errors = "replace")
             }, ignore_index=True)
-        df_text.to_csv(filename, encoding='utf8')
+        df_text.to_csv(filename, encoding = "utf-8")
         print("Done !")
         print("Saved to {}".format(filename))
 
@@ -468,7 +470,7 @@ class Selfstats:
                 print self.summary.get(key, 0), name
             print
 
-        if self.args['key_freqs'] and not self.args['typing_quality']:
+        if self.args['key_freqs']:
             print 'Key frequencies:'
             for key, val in self.summary['key_freqs'].most_common():
                 print key, val
@@ -483,7 +485,7 @@ class Selfstats:
             print(np.std(self.summary["typing_speeds"]))
 
         if self.args["typing_quality"]:
-            key_analysis.display_typing_quality(self.summary["typing_quality"], keys_freq = self.summary['key_freqs'])
+            key_analysis.display_typing_quality(self.summary["typing_quality"])
 
         if self.args['pkeys']:
             print 'Processes sorted by keystrokes:'

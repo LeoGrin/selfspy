@@ -36,9 +36,6 @@ import numpy as np
 
 #############
 
-
-
-
 def sorted_unique(array, n=10):
     """"sort the unique element of an array by count, and display the nth first"""
     n = min(n, len(array))
@@ -56,9 +53,21 @@ def sorted_unique_rates(array, n, dic_counts):
     """
     n = min(n, len(array))
     ar, count = np.unique(array, return_counts=True)
-    rates = np.array([float(count[i]) / dic_counts[ar[i]] for i in range(len(count)) if dic_counts[ar[i]] > 0]) # TODO the condition should'nt be necessaary
+    rates = np.array([float(count[i]) / dic_counts[ar[i]] for i in range(len(count))]) # TODO the condition should'nt be necessaary
     indices = np.argsort(-rates)
-    return ar[indices][:n], rates[indices][:n]
+    uncertainty = [1.96 * np.sqrt(rates[i] * (1 - rates[i]) / float(count[i])) for i in indices] # binomial uncertainty
+    return ar[indices][:n], rates[indices][:n], uncertainty[:n]
+
+def find_keys_typed_instead(key, l_coupled, n=10):
+    couples, counts = np.unique(l_coupled, return_counts=True)
+    matched_indices = [i for i in range(len(couples)) if len(couples[i]) > 1 and couples[i][1]==key]
+    matched_couples, matched_counts = couples[matched_indices], counts[matched_indices]
+    total_counts = sum(matched_counts)
+    sorted_indices = np.argsort(-matched_counts)
+    sorted_couples = matched_couples[sorted_indices]
+    sorted_rates = [float(count) / total_counts for count in matched_counts[sorted_indices]]
+    return [couple[0] for couple in sorted_couples[:n]], sorted_rates[:n]
+
 
 def sorted_unique_rates_coupled(array, n, dic_counts):
     """
@@ -70,11 +79,13 @@ def sorted_unique_rates_coupled(array, n, dic_counts):
     """
     n = min(n, len(array))
     ar, count = np.unique(array, return_counts=True)
-    rates = np.array([float(count[i]) / dic_counts[ar[i][1]] for i in range(len(count)) if len(ar[i]) > 1 and dic_counts[ar[i][1]] > 0]) # TODO the conditions should'nt be necessaary
-    indices = np.argsort(-rates)
+
+    rates = np.array([float(count[i]) / dic_counts[ar[i][1]] for i in range(len(count)) if len(ar[i]) > 1]) # TODO the conditions should'nt be necessaary
+    indices = [i for i in np.argsort(-rates) if len(ar[i]) > 1] # TODO the condition should'nt be necessaary
     return ar[indices][:n], rates[indices][:n]
 
-def display_typing_quality(dic, n=15, keys_freq = None):
+
+def display_typing_quality(dic, n=15):
     """
     Display typing quality statistics for selfstats
     :param dic: dic of the form {l_deleted, l_correct, l_coupled, l_inversion, n_unnecessary}
@@ -85,32 +96,30 @@ def display_typing_quality(dic, n=15, keys_freq = None):
     print("{} deleted letters (excluding unnecessary backspace and inversions)".format(len(dic["l_deleted"])))
     print
     print("Most missed keys (excluding inversions): ")
-    if not keys_freq:
-        # show absolute number of time missed
-        keys, counts = sorted_unique(dic["l_correct"], n)
-        for i in range(len(keys)):
-            print(u"Key : {} ({} times)".format(keys[i], counts[i]))
-    else:
-        # show ratio of missed / typed
-        keys, rates = sorted_unique_rates(dic["l_correct"], n, keys_freq)
-        for i in range(len(keys)):
-            print(u"Key : {} ({}% missed)".format(keys[i], int(rates[i] * 100)))
 
+
+    # show ratio of missed / typed
+    keys, rates, uncertainty = sorted_unique_rates(dic["l_correct"], n, dic["dic_keys"])
+    for i, key in enumerate(keys):
+        print(u"Key: {} ({}% missed +- {}%)".format(key, int(rates[i] * 100), int(uncertainty[i] * 100)))
+        keys_instead, rates_instead = find_keys_typed_instead(key, dic["l_coupled"], 5)
+
+        print(u"Typed instead: {}".format(", ".join([keys_instead[i] + " (" + str(int(rates_instead[i] * 100)) + "%)" for i in range(len(keys_instead))])))
+       # for j in range(len(keys_instead)):
+        #    print(keys_instead[j][0])
+        #    print(u"{} instead ({}%)".format(keys_instead[j][0], int(rates_instead[j]*100)))
     print
-    print("Keys you most type instead of another (excluding inversions): ")
-    if not keys_freq:
-        keys, counts = sorted_unique(dic["l_coupled"], n)
-        for i in range(len(keys)):
-            print(u"Keys : {} instead of {} ({} times)".format(keys[i][0], keys[i][1], counts[i]))
-    else:
-        keys, rates = sorted_unique_rates_coupled(dic["l_coupled"], n, keys_freq)
-        for i in range(len(keys)):
-            print("Keys : {} instead of {} ({}%)".format(keys[i][0], keys[i][1], int(rates[i] * 100)))
-    print
+
+    #print("Keys you most type instead of another (excluding inversions): ")
+    #keys_couple, rates_couple = sorted_unique_rates_coupled(dic["l_coupled"], len(dic["l_coupled"]), dic["dic_keys"])
+    #for i in range(n):
+    #    print(u"Keys : {} instead of {} ({}%)".format(keys_couple[i][0], keys_couple[i][1], int(rates_couple[i] * 100)))
+    #print
+
     print("Keys you most invert (e.g ts instead of st): ")
     keys, counts = sorted_unique(dic["l_inversion"], n)
     for i in range(len(keys)):
-        print(u"Keys : {} instead of {} ({} times)".format(keys[i][0] + keys[i][1], keys[i][1] + keys[i][0], counts[i]))
+        print(u"Keys: {} instead of {} ({} times)".format(keys[i][0] + keys[i][1], keys[i][1] + keys[i][0], counts[i]))
 
 
 def create_dic():
@@ -119,7 +128,7 @@ def create_dic():
      selfstats code intact.
     :return: the created dictionnary
     """
-    dic = {"l_deleted": [], "l_correct": [], "l_coupled": [], "l_inversion": [], "n_unnecessary": 0}
+    dic = {"l_deleted": [], "l_correct": [], "l_coupled": [], "l_inversion": [], "n_unnecessary": 0, "dic_keys": {}}
 
     return dic
 
@@ -130,6 +139,7 @@ def update_dic(dic, text):
     :param text: new text to analysie
     :return: the updated dictionnary
     """
+    dic = count_keys(text, dic) # TODO : count_keys and keys_around_backspace don't have the same structure
     l_deleted_new, l_correct_new, l_coupled_new, l_inversion_new, n_unnecessary_new = keys_around_backspace(text)
 
     dic["l_deleted"].extend(l_deleted_new)
@@ -157,6 +167,8 @@ def inversion_more_backspace(s_left, n_backspace, s_right):
 
 
 def keys_around_backspace(s):
+    #TODO test
+    #TODO check there are no pb with < and >
     match_1_backspace = re.findall("([^\>])\<\[[^\]]*Backspace\]\>([^\<]+)(?:\<|\Z)", s) # match jfksdfj<[Backspace]>jdskjd and return the erased letter and the replacement text
     match_more_backpace = re.findall("(?:\A|\>)([^\>]+)\<\[[^\]]*Backspace\]x(\d*)\>([^\<]+)(?:\<|\Z)", s)# match dfdfkl<[Backspace]x2>kjkfkdjf etc. and return the erased letter and the replacement text
     l_deleted, l_correct, l_coupled, l_inversion = [], [], [], []
@@ -200,6 +212,20 @@ def keys_around_backspace(s):
                             l_coupled.append(key_deleted + key_replaced)
 
     return l_deleted, l_correct, l_coupled, l_inversion, n_unnecessary
+
+def count_keys(s, dic):
+    #TODO : test
+    match = re.findall("(?:\A|\>)(.+?)(?:\<\[|\Z)", s)
+    for group in match:
+        keys, counts = np.unique(list(group), return_counts=True)
+        for i, key in enumerate(keys):
+            if key not in dic["dic_keys"].keys():
+                dic["dic_keys"][key] = counts[i]
+            else:
+                dic["dic_keys"][key] += counts[i]
+
+    return dic
+
 
 if __name__ == """__main__""":
 
