@@ -91,7 +91,7 @@ def sorted_unique_rates_coupled(array, n, dic_counts):
     return ar[indices][:n], rates[indices][:n]
 
 
-def display_typing_quality(dic, n=15):
+def display_typing_quality(dic, n=25):
     """
     Display typing quality statistics for selfstats
     :param dic: dic of the form {l_deleted, l_correct, l_coupled, l_inversion, n_unnecessary}
@@ -127,22 +127,21 @@ def display_typing_quality(dic, n=15):
     for i in indices_keys[:n]:
         print(u"Key: {}  ({} ms +- {})".format(keys[i], int(1000 * speeds_keys[i]), int(2 * 1000 * std_speeds_keys[i]))) #gaussian approx of 95 interval
     print
-    n_cmd_typed = sum([len(ar) for ar in dic["dic_cmd_speed"].values()])
-    dic["dic_cmd_speed"], n_outliers_cmd = remove_outliers(dic["dic_cmd_speed"]) # outliers detection
-    speeds_cmd = np.array([np.mean(dic["dic_cmd_speed"][key]) for key in dic["dic_cmd_speed"].keys()])
-    std_speeds_cmd = np.array([np.std(dic["dic_cmd_speed"][key]) for key in dic["dic_cmd_speed"].keys()])
-    cmds = [cmd for cmd in dic["dic_cmd_speed"].keys()]
-    indices_cmd = np.argsort(-speeds_cmd)
-    print("Commands typed most slowly ({} / {} commands removed as outliers): (less trustable)".format(n_outliers_cmd, n_cmd_typed))
-    for i in indices_cmd[:n]:
-        print(u"Command: {} ({} ms +- {})".format(cmds[i], int(1000 * speeds_cmd[i]), int(2 * 1000 * std_speeds_cmd[i]))) #gaussian approx of 95 interval
-
-
-
 
     ############
     # Probably not so useful to display
     ##########
+    # n_cmd_typed = sum([len(ar) for ar in dic["dic_cmd_speed"].values()])
+    # dic["dic_cmd_speed"], n_outliers_cmd = remove_outliers(dic["dic_cmd_speed"]) # outliers detection
+    # speeds_cmd = np.array([np.mean(dic["dic_cmd_speed"][key]) for key in dic["dic_cmd_speed"].keys()])
+    # std_speeds_cmd = np.array([np.std(dic["dic_cmd_speed"][key]) for key in dic["dic_cmd_speed"].keys()])
+    # cmds = [cmd for cmd in dic["dic_cmd_speed"].keys()]
+    # indices_cmd = np.argsort(-speeds_cmd)
+    # print("Commands typed most slowly ({} / {} commands removed as outliers): (less trustable)".format(n_outliers_cmd, n_cmd_typed))
+    # for i in indices_cmd[:n]:
+    #     print(u"Command: {} ({} ms +- {})".format(cmds[i], int(1000 * speeds_cmd[i]), int(2 * 1000 * std_speeds_cmd[i]))) #gaussian approx of 95 interval
+    # print
+
     #print("Keys you most type instead of another (excluding inversions): ")
     #keys_couple, rates_couple = sorted_unique_rates_coupled(dic["l_coupled"], len(dic["l_coupled"]), dic["dic_char_count"])
     #for i in range(n):
