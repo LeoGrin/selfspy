@@ -1,4 +1,16 @@
-### What is this?
+## Why this fork?
+This fork focuses on automatically evaluating typing quality. This can be used for two reasons: 
+- improving typing quality, by having access to your weakest keys and other useful statistics.
+- providing an automatic Quantified Self measure, which you can correlate with the covariates of your choice.
+
+## How to use it?
+When you have installed selfspy (see below), you can access your typing statistics (weakest keys etc.) by using:
+```
+selfstats --typing-quality
+```
+
+## README from [original selfspy](https://github.com/selfspy/selfspy)
+### What is selfspy? 
 Selfspy is a daemon for Unix/X11, (thanks to @ljos!) Mac OS X and (thanks to @Foxboron) Windows, that continuously monitors and stores what you are doing on your computer. This way, you can get all sorts of nifty statistics and reminders on what you have been up to. It is inspired by the [Quantified Self](http://en.wikipedia.org/wiki/Quantified_Self)-movement and [Stephen Wolfram's personal key logging](http://blog.stephenwolfram.com/2012/03/the-personal-analytics-of-my-life/).
 
 See Example Statistics, below, for some of the fabulous things you can do with this data.
@@ -189,16 +201,17 @@ Selfstats is a swiss army knife of self knowledge. Experiment with it when you h
 
 ### Selfstats Reference
 
-The --help is a beast that right now looks something like this:
+The --help (updated for this fork) is a beast that right now looks something like this:
 
 ```
 usage: selfstats [-h] [-c FILE] [-p PASSWORD] [-d DATA_DIR] [-s]
-                    [-D DATE [DATE ...]] [-C CLOCK] [-i ID]
-                    [-b BACK [BACK ...]] [-l LIMIT [LIMIT ...]] [-m nr]
-                    [-T regexp] [-P regexp] [-B regexp] [--ratios] [--clicks]
-                    [--key-freqs] [--human-readable] [--active [seconds]] [--periods [seconds]]
-                    [--pactive [seconds]] [--tactive [seconds]] [--pkeys]
-                    [--tkeys]
+                 [-D DATE [DATE ...]] [-C CLOCK] [-i ID] [-b BACK [BACK ...]]
+                 [-l LIMIT [LIMIT ...]] [-m nr] [-T regexp] [-P regexp]
+                 [-B regexp] [--clicks] [--key-freqs] [--human-readable]
+                 [--active [seconds]] [--ratios [seconds]]
+                 [--periods [seconds]] [--pactive [seconds]]
+                 [--tactive [seconds]] [--pkeys] [--tkeys] [--export-text]
+                 [--typing-speed] [--typing-quality]
 
 Calculate statistics on selfspy data. Per default it will show non-text
 information that matches the filter. Adding '-s' means also show text. Adding
@@ -270,8 +283,8 @@ optional arguments:
   -m nr, --min-keys nr  Only allow entries with at least <nr> keystrokes
   -T regexp, --title regexp
                         Only allow entries where a search for this <regexp> in
-                        the window title matches something. All regular expressions
-                        are case insensitive.
+                        the window title matches something. All regular
+                        expressions are case insensitive.
   -P regexp, --process regexp
                         Only allow entries where a search for this <regexp> in
                         the process matches something.
@@ -303,6 +316,11 @@ optional arguments:
                         them. Optional argument works same as for --active.
   --pkeys               List processes sorted by number of keystrokes.
   --tkeys               List window titles sorted by number of keystrokes.
+  --export-text         Export the text db to a csv for further analysis
+  --typing-speed        Display typing speed (useful in combination with
+                        dates)
+  --typing-quality      Display typing quality, i.e number of errors and show
+                        worst keys
 
 See the README file or http://gurgeh.github.com/selfspy for examples.
 ```

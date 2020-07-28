@@ -38,6 +38,10 @@ from selfspy.password_dialog import get_password
 from selfspy.period import Period
 
 from selfspy import models
+import pandas as pd
+import numpy as np
+import selfspy.key_analysis as key_analysis
+
 
 import codecs
 sys.stdout = codecs.getwriter('utf8')(sys.stdout)
@@ -45,7 +49,7 @@ sys.stdout = codecs.getwriter('utf8')(sys.stdout)
 ACTIVE_SECONDS = 180
 PERIOD_LOOKUP = {'s': 'seconds', 'm': 'minutes', 'h': 'hours', 'd': 'days', 'w': 'weeks'}
 ACTIVITY_ACTIONS = {'active', 'periods', 'pactive', 'tactive', 'ratios'}
-SUMMARY_ACTIONS = ACTIVITY_ACTIONS.union({'pkeys', 'tkeys', 'key_freqs', 'clicks', 'ratios'})
+SUMMARY_ACTIONS = ACTIVITY_ACTIONS.union({'pkeys', 'tkeys', 'key_freqs', 'clicks', 'ratios', 'typing_speed', 'typing_quality'})
 
 PROCESS_ACTIONS = {'pkeys', 'pactive'}
 WINDOW_ACTIONS = {'tkeys', 'tactive'}
@@ -204,6 +208,8 @@ class Selfstats:
         if self.need_summary:
             self.calc_summary()
             self.show_summary()
+        elif self.need_export:
+            self.export_text_to_csv()
         else:
             self.show_rows()
 
@@ -214,9 +220,13 @@ class Selfstats:
         self.need_keys = False
         self.need_humanreadable = False
         self.need_summary = False
+        self.need_export = False # added
         self.need_process = any(self.args[k] for k in PROCESS_ACTIONS)
         self.need_window = any(self.args[k] for k in WINDOW_ACTIONS)
 
+        if self.args["export_text"]: #added
+            self.need_export = True
+            self.args['showtext'] = True
         if self.args['body'] is not None:
             self.need_text = True
         if self.args['showtext']:
@@ -230,6 +240,8 @@ class Selfstats:
             self.need_timings = True
         if self.args['key_freqs']:
             self.need_keys = True
+        if self.args['typing_quality']:
+            self.need_keys = True # we need to access the keys
         if self.args['human_readable']:
             self.need_humanreadable = True
 
@@ -335,12 +347,35 @@ class Selfstats:
             print row.id, row.started, pretty_seconds((row.created_at - row.started).total_seconds()), row.process.name, '"%s"' % row.window.title, row.nrkeys,
             if self.args['showtext']:
                 if self.need_humanreadable:
-                    print row.decrypt_humanreadable().decode('utf8')
+                    # TODO : I don't think the errors = replace is a good solution. There must be an encoding pb
+                    #print row.decrypt_humanreadable()
+                    print row.decrypt_humanreadable().decode('utf8', errors = "replace")
                 else:
                     print row.decrypt_text().decode('utf8')
             else:
                 print
         print rows, 'rows'
+
+
+    def export_text_to_csv(self, filename = "./selfspy_df.csv"):
+        # TODO : I don't think the errors = replace is a good solution. There must be an encoding pb
+        print "exporting text db to csv...."
+        fkeys = self.filter_keys()
+        df_text = pd.DataFrame(columns = ["process_name", "window_title", "nr_keys", "start_time", "length_time", "text"])
+        for row in fkeys:
+            df_text = df_text.append({
+                "process_name" : row.process.name,
+                "window_title" : row.window.title,
+                "nr_keys" : row.nrkeys,
+                "start_time" : row.started,
+                "length_time" : row.created_at - row.started,
+                "text" : row.decrypt_text().decode('utf8', errors = "replace"),
+                "hr_text" : row.decrypt_humanreadable().decode('utf8', errors = "replace")
+            }, ignore_index=True)
+        df_text.to_csv(filename, encoding = "utf-8")
+        print("Done !")
+        print("Saved to {}".format(filename))
+
 
     def calc_summary(self):
         def updict(d1, d2, activity_times, sub=None):
@@ -363,7 +398,12 @@ class Selfstats:
         processes = {}
         windows = {}
         timings = []
+        typing_speeds = []
         keys = Counter()
+        # for evaluating typing qual
+        typing_quality_dic = key_analysis.create_dic()
+
+
         for row in self.filter_keys():
             d = {'nr': 1,
                  'keystrokes': len(row.load_timings())}
@@ -378,6 +418,11 @@ class Selfstats:
 
             if self.args['key_freqs']:
                 keys.update(row.decrypt_keys())
+            if self.args['typing_speed']:
+                typing_speeds.append(row.nrkeys / (row.created_at - row.started).total_seconds())
+            if self.args['typing_quality']:
+                key_analysis.update_dic(typing_quality_dic, row.decrypt_text().decode('utf8'), row.decrypt_keys(), row.load_timings())
+
 
         for click in self.filter_clicks():
             d = {'noscroll_clicks': click.button not in [4, 5],
@@ -397,6 +442,10 @@ class Selfstats:
         self.summary = sumd
         if self.args['key_freqs']:
             self.summary['key_freqs'] = keys
+        if self.args['typing_speed']:
+            self.summary["typing_speeds"] = typing_speeds
+        if self.args['typing_quality']:
+            self.summary["typing_quality"] = typing_quality_dic
 
     def show_summary(self):
         print '%d keystrokes in %d key sequences,' % (self.summary.get('keystrokes', 0), self.summary.get('nr', 0)),
@@ -426,6 +475,17 @@ class Selfstats:
             for key, val in self.summary['key_freqs'].most_common():
                 print key, val
             print
+
+        if self.args['typing_speed']:
+            #TODO : add progression
+            print( "Typing speed:")
+            print("mean speed :")
+            print(np.mean(self.summary["typing_speeds"]))
+            print("std speed:")
+            print(np.std(self.summary["typing_speeds"]))
+
+        if self.args["typing_quality"]:
+            key_analysis.display_typing_quality(self.summary["typing_quality"])
 
         if self.args['pkeys']:
             print 'Processes sorted by keystrokes:'
@@ -489,6 +549,7 @@ class Selfstats:
             print
 
 
+
 def parse_config():
     conf_parser = argparse.ArgumentParser(description=__doc__, add_help=False,
                                           formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -543,6 +604,9 @@ def parse_config():
 
     parser.add_argument('--pkeys', action='store_true', help='List processes sorted by number of keystrokes.')
     parser.add_argument('--tkeys', action='store_true', help='List window titles sorted by number of keystrokes.')
+    parser.add_argument('--export-text', action='store_true', help='Export the text db to a csv for further analysis')
+    parser.add_argument('--typing-speed', action='store_true', help='Display typing speed (useful in combination with dates)')
+    parser.add_argument('--typing-quality', action='store_true',help='Display typing quality, i.e number of errors and show worst keys')
 
     return parser.parse_args()
 
