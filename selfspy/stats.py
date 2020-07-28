@@ -421,7 +421,7 @@ class Selfstats:
             if self.args['typing_speed']:
                 typing_speeds.append(row.nrkeys / (row.created_at - row.started).total_seconds())
             if self.args['typing_quality']:
-                key_analysis.update_dic(typing_quality_dic, row.decrypt_text().decode('utf8'))
+                key_analysis.update_dic(typing_quality_dic, row.decrypt_text().decode('utf8'), row.decrypt_keys(), row.load_timings())
 
 
         for click in self.filter_clicks():

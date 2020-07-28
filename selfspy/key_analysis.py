@@ -99,7 +99,7 @@ def display_typing_quality(dic, n=15):
 
 
     # show ratio of missed / typed
-    keys, rates, uncertainty = sorted_unique_rates(dic["l_correct"], n, dic["dic_keys"])
+    keys, rates, uncertainty = sorted_unique_rates(dic["l_correct"], n, dic["dic_char_count"])
     for i, key in enumerate(keys):
         print(u"Key: {} ({}% missed +- {}%)".format(key, int(rates[i] * 100), int(uncertainty[i] * 100)))
         keys_instead, rates_instead = find_keys_typed_instead(key, dic["l_coupled"], 5)
@@ -110,16 +110,39 @@ def display_typing_quality(dic, n=15):
         #    print(u"{} instead ({}%)".format(keys_instead[j][0], int(rates_instead[j]*100)))
     print
 
+    speeds_keys = np.array([np.mean(dic["dic_key_speed"][key]) for key in dic["dic_key_speed"].keys()])
+    std_speeds_keys = np.array([np.std(dic["dic_key_speed"][key]) for key in dic["dic_key_speed"].keys()])
+    keys = [key for key in dic["dic_key_speed"].keys()]
+    indices_keys = np.argsort(-speeds_keys)
+    print("Keys typed most slowly:")
+    for i in indices_keys[:n]:
+        print(u"Key: {}  ({} seconds +- {})".format(keys[i], speeds_keys[i], 2 * std_speeds_keys[i])) #gaussian approx of 95 interval
+    print
+
+    speeds_cmd = np.array([np.mean(dic["dic_cmd_speed"][key]) for key in dic["dic_cmd_speed"].keys()])
+    std_speeds_cmd = np.array([np.std(dic["dic_cmd_speed"][key]) for key in dic["dic_cmd_speed"].keys()])
+    cmds = [cmd for cmd in dic["dic_cmd_speed"].keys()]
+    indices_cmd = np.argsort(-speeds_cmd)
+    print("Commands typed most slowly: (less trustable)")
+    for i in indices_cmd[:n]:
+        print(u"Command: {} ({} seconds +- {})".format(cmds[i], speeds_cmd[i], 2 * std_speeds_cmd[i])) #gaussian approx of 95 interval
+
+
+
+
+    ############
+    # Probably not so useful to display
+    ##########
     #print("Keys you most type instead of another (excluding inversions): ")
-    #keys_couple, rates_couple = sorted_unique_rates_coupled(dic["l_coupled"], len(dic["l_coupled"]), dic["dic_keys"])
+    #keys_couple, rates_couple = sorted_unique_rates_coupled(dic["l_coupled"], len(dic["l_coupled"]), dic["dic_char_count"])
     #for i in range(n):
     #    print(u"Keys : {} instead of {} ({}%)".format(keys_couple[i][0], keys_couple[i][1], int(rates_couple[i] * 100)))
     #print
 
-    print("Keys you most invert (e.g ts instead of st): ")
-    keys, counts = sorted_unique(dic["l_inversion"], n)
-    for i in range(len(keys)):
-        print(u"Keys: {} instead of {} ({} times)".format(keys[i][0] + keys[i][1], keys[i][1] + keys[i][0], counts[i]))
+    # print("Keys you most invert (e.g ts instead of st): ")
+    # keys, counts = sorted_unique(dic["l_inversion"], n)
+    # for i in range(len(keys)):
+    #     print(u"Keys: {} instead of {} ({} times)".format(keys[i][0] + keys[i][1], keys[i][1] + keys[i][0], counts[i]))
 
 
 def create_dic():
@@ -128,25 +151,29 @@ def create_dic():
      selfstats code intact.
     :return: the created dictionnary
     """
-    dic = {"l_deleted": [], "l_correct": [], "l_coupled": [], "l_inversion": [], "n_unnecessary": 0, "dic_keys": {}}
+    dic = {"l_deleted": [], "l_correct": [], "l_coupled": [], "l_inversion": [], "n_unnecessary": 0, "dic_char_count": {}, "dic_key_speed": {}, "dic_cmd_speed": {}}
 
     return dic
 
 
-def update_dic(dic, text):
+def update_dic(dic, text, keys, times):
     """
     :param dic:  dic of the form {l_deleted, l_correct, l_coupled, l_inversion, n_unnecessary}
     :param text: new text to analysie
+    :param keys: list of keys (corresponding to text)
+    :param times: list of times (corresponding to keys
     :return: the updated dictionnary
     """
     dic = count_keys(text, dic) # TODO : count_keys and keys_around_backspace don't have the same structure
-    l_deleted_new, l_correct_new, l_coupled_new, l_inversion_new, n_unnecessary_new = keys_around_backspace(text)
 
+    l_deleted_new, l_correct_new, l_coupled_new, l_inversion_new, n_unnecessary_new = keys_around_backspace(text)
     dic["l_deleted"].extend(l_deleted_new)
     dic["l_correct"].extend(l_correct_new)
     dic["l_coupled"].extend(l_coupled_new)
     dic["l_inversion"].extend(l_inversion_new)
     dic["n_unnecessary"] += n_unnecessary_new
+
+    dic = key_speeds(keys, times, dic)
 
     return dic
 
@@ -215,16 +242,38 @@ def keys_around_backspace(s):
 
 def count_keys(s, dic):
     #TODO : test
+    #TODO : isn't it simpler is we use row.decrypt_keys instead of row.decrypt_text ?
     match = re.findall("(?:\A|\>)(.+?)(?:\<\[|\Z)", s)
     for group in match:
         keys, counts = np.unique(list(group), return_counts=True)
         for i, key in enumerate(keys):
-            if key not in dic["dic_keys"].keys():
-                dic["dic_keys"][key] = counts[i]
+            if key not in dic["dic_char_count"].keys():
+                dic["dic_char_count"][key] = counts[i]
             else:
-                dic["dic_keys"][key] += counts[i]
+                dic["dic_char_count"][key] += counts[i]
 
     return dic
+
+def key_speeds(keys, times, dic):
+    #TODO test
+    #TODO what about <[Backspace]x2>
+    #TODO : what about repeated char (when I leave my finger on the keys)
+    #TODO : combine speed with correctness (if you want to type g but you type f<[Backspace]>g you should count the time to type the three keys for g)
+    for i, key in enumerate(keys):
+        if (i > 1 and keys[i-1][:2] != "<["): #we don't count the time when the key is typed after a command (cause there is probably reflexion involved)
+            if key[:2] == "<[": #if it's a command:
+                if key not in dic["dic_cmd_speed"].keys():
+                    dic["dic_cmd_speed"][key] = [times[i]]
+                else:
+                    dic["dic_cmd_speed"][key].append(times[i])
+            else:
+                if key not in dic["dic_key_speed"].keys():
+                    dic["dic_key_speed"][key] = [times[i]]
+                else:
+                    dic["dic_key_speed"][key].append(times[i])
+    return dic
+
+
 
 
 if __name__ == """__main__""":
