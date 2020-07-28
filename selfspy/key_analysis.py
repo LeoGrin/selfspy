@@ -1,6 +1,7 @@
 import re
 import pandas as pd
 import numpy as np
+from sklearn.covariance import EllipticEnvelope
 
 
 # TODO:
@@ -35,6 +36,11 @@ import numpy as np
 # but <Left><Enter><[Backspace]> makes it hard to know what was the erased letter : this backspace should not be counted
 
 #############
+
+
+def export_typing_stats(dic):
+    df = pd.DataFrame.from_dict(dic["dic_key_speed"], orient = "index") #padding with Nans
+    df.to_csv("./typing_stats_db.csv", encoding = "utf-8")
 
 def sorted_unique(array, n=10):
     """"sort the unique element of an array by count, and display the nth first"""
@@ -97,7 +103,7 @@ def display_typing_quality(dic, n=15):
     print
     print("Most missed keys (excluding inversions): ")
 
-
+    ## Typing correctess
     # show ratio of missed / typed
     keys, rates, uncertainty = sorted_unique_rates(dic["l_correct"], n, dic["dic_char_count"])
     for i, key in enumerate(keys):
@@ -110,22 +116,26 @@ def display_typing_quality(dic, n=15):
         #    print(u"{} instead ({}%)".format(keys_instead[j][0], int(rates_instead[j]*100)))
     print
 
+    ## Typing speed
+    n_keys_typed = sum([len(ar) for ar in dic["dic_key_speed"].values()])
+    dic["dic_key_speed"], n_outliers_keys = remove_outliers(dic["dic_key_speed"]) # outliers detection
     speeds_keys = np.array([np.mean(dic["dic_key_speed"][key]) for key in dic["dic_key_speed"].keys()])
     std_speeds_keys = np.array([np.std(dic["dic_key_speed"][key]) for key in dic["dic_key_speed"].keys()])
     keys = [key for key in dic["dic_key_speed"].keys()]
     indices_keys = np.argsort(-speeds_keys)
-    print("Keys typed most slowly:")
+    print("Keys typed most slowly ({} / {} keystrokes removed as outliers): ".format(n_outliers_keys, n_keys_typed))
     for i in indices_keys[:n]:
-        print(u"Key: {}  ({} seconds +- {})".format(keys[i], speeds_keys[i], 2 * std_speeds_keys[i])) #gaussian approx of 95 interval
+        print(u"Key: {}  ({} ms +- {})".format(keys[i], int(1000 * speeds_keys[i]), int(2 * 1000 * std_speeds_keys[i]))) #gaussian approx of 95 interval
     print
-
+    n_cmd_typed = sum([len(ar) for ar in dic["dic_cmd_speed"].values()])
+    dic["dic_cmd_speed"], n_outliers_cmd = remove_outliers(dic["dic_cmd_speed"]) # outliers detection
     speeds_cmd = np.array([np.mean(dic["dic_cmd_speed"][key]) for key in dic["dic_cmd_speed"].keys()])
     std_speeds_cmd = np.array([np.std(dic["dic_cmd_speed"][key]) for key in dic["dic_cmd_speed"].keys()])
     cmds = [cmd for cmd in dic["dic_cmd_speed"].keys()]
     indices_cmd = np.argsort(-speeds_cmd)
-    print("Commands typed most slowly: (less trustable)")
+    print("Commands typed most slowly ({} / {} commands removed as outliers): (less trustable)".format(n_outliers_cmd, n_cmd_typed))
     for i in indices_cmd[:n]:
-        print(u"Command: {} ({} seconds +- {})".format(cmds[i], speeds_cmd[i], 2 * std_speeds_cmd[i])) #gaussian approx of 95 interval
+        print(u"Command: {} ({} ms +- {})".format(cmds[i], int(1000 * speeds_cmd[i]), int(2 * 1000 * std_speeds_cmd[i]))) #gaussian approx of 95 interval
 
 
 
@@ -173,7 +183,8 @@ def update_dic(dic, text, keys, times):
     dic["l_inversion"].extend(l_inversion_new)
     dic["n_unnecessary"] += n_unnecessary_new
 
-    dic = key_speeds(keys, times, dic)
+    dic = key_speeds(keys, times, dic, remove_outliers=True)
+
 
     return dic
 
@@ -254,7 +265,7 @@ def count_keys(s, dic):
 
     return dic
 
-def key_speeds(keys, times, dic):
+def key_speeds(keys, times, dic, remove_outliers=True):
     #TODO test
     #TODO what about <[Backspace]x2>
     #TODO : what about repeated char (when I leave my finger on the keys)
@@ -273,7 +284,22 @@ def key_speeds(keys, times, dic):
                     dic["dic_key_speed"][key].append(times[i])
     return dic
 
+def remove_outliers(dic):
+    """
+    Remove outliers from times to type a key, based on EllipticEnvelope detection
+    :param dic: dictonnary of the form key: list of times (not the whole dictionnary we update at each row)
+    :return: the same dictionnary with outliers removed
+    """
+    n_outliers = 0
+    for key in dic.keys():
+        times = np.array(dic[key]).reshape(-1, 1) # reshape for sklearn
+        if times.shape[0] > 1: # required to find outliers
+            outliers = EllipticEnvelope().fit_predict(times)
+            n_outliers += len(np.where(outliers == -1)[0])
+            times_without_outliers = times.reshape(-1)[np.where(outliers == 1)[0]]
+            dic[key] = times_without_outliers
 
+    return dic, n_outliers
 
 
 if __name__ == """__main__""":
