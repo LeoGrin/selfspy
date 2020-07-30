@@ -2,6 +2,8 @@ import re
 import pandas as pd
 import numpy as np
 from sklearn.covariance import EllipticEnvelope
+import string
+import matplotlib.pyplot as plt
 
 
 # TODO:
@@ -62,6 +64,10 @@ def sorted_unique_rates(array, n, dic_counts):
     rates = np.array([float(count[i]) / dic_counts[ar[i]] for i in range(len(count))]) # TODO the condition should'nt be necessaary
     indices = np.argsort(-rates)
     uncertainty = [1.96 * np.sqrt(rates[i] * (1 - rates[i]) / float(count[i])) for i in indices] # binomial uncertainty
+    # show skewness to see if a gaussian approximation is reasonable (it isn't for now, but maybe with more data)
+    # skewness = [np.abs(1 - 2 * rates[i]) / np.sqrt(n * rates[i] * (1 - rates[i])) for i in indices]
+    # print(sum([a < 1./3 for a in skewness]))
+    # print(skewness)
     return ar[indices][:n], rates[indices][:n], uncertainty[:n]
 
 def find_keys_typed_instead(key, l_coupled, n=10):
@@ -101,31 +107,55 @@ def display_typing_quality(dic, n=25):
     print("{} inverted letters (e.g ts instead of st)".format(len(dic["l_inversion"])))
     print("{} deleted letters (excluding unnecessary backspace and inversions)".format(len(dic["l_deleted"])))
     print
-    print("Most missed keys (excluding inversions): ")
 
     ## Typing correctess
     # show ratio of missed / typed
+    n_chars = sum([value for value in dic["dic_char_count"].values()]) #TODO merge with key count
+    n_missed = len(dic["l_correct"])
+    total_missing_rate = float(n_missed) / n_chars
+    print("Total missing rate : {}% +- {}".format(int(10000 * total_missing_rate) / 100., int(10000 * 1.96 * np.sqrt(
+        total_missing_rate * (1 - total_missing_rate) / float(n_chars))) / 100.))  # TODO check this rate
+    print
+    print("Most missed keys (excluding inversions): ")
     keys, rates, uncertainty = sorted_unique_rates(dic["l_correct"], n, dic["dic_char_count"])
     for i, key in enumerate(keys):
         print(u"Key: {} ({}% missed +- {}%)".format(key, int(rates[i] * 100), int(uncertainty[i] * 100)))
         keys_instead, rates_instead = find_keys_typed_instead(key, dic["l_coupled"], 5)
-
         print(u"Typed instead: {}".format(", ".join([keys_instead[i] + " (" + str(int(rates_instead[i] * 100)) + "%)" for i in range(len(keys_instead))])))
-       # for j in range(len(keys_instead)):
-        #    print(keys_instead[j][0])
-        #    print(u"{} instead ({}%)".format(keys_instead[j][0], int(rates_instead[j]*100)))
     print
 
     ## Typing speed
-    n_keys_typed = sum([len(ar) for ar in dic["dic_key_speed"].values()])
+    n_keys_typed_with_outliers = sum([len(ar) for ar in dic["dic_key_speed"].values()])
     dic["dic_key_speed"], n_outliers_keys = remove_outliers(dic["dic_key_speed"]) # outliers detection
-    speeds_keys = np.array([np.mean(dic["dic_key_speed"][key]) for key in dic["dic_key_speed"].keys()])
+    all_keys_speeds = np.concatenate([ar for ar in dic["dic_key_speed"].values()])
+    print("{} / {} keystrokes removed as outliers".format(n_outliers_keys, n_keys_typed_with_outliers))
+    print("Mean time to type a key : {} ms [{}, {}] 90%".format(int(1000 * np.mean(all_keys_speeds)), int(1000 * np.quantile(all_keys_speeds, 0.05)), int(1000 * np.quantile(all_keys_speeds, 0.95)))) #gaussian approx of 95 interval
+    print
+    #TODO show speed by word
+    #TODO show metric
+    mean_speeds_keys = np.array([np.mean(dic["dic_key_speed"][key]) for key in dic["dic_key_speed"].keys()])
     std_speeds_keys = np.array([np.std(dic["dic_key_speed"][key]) for key in dic["dic_key_speed"].keys()])
+    q5_speeds_keys = np.array([np.quantile(dic["dic_key_speed"][key], 0.05) for key in dic["dic_key_speed"].keys()])
+    q95_speeds_keys = np.array([np.quantile(dic["dic_key_speed"][key], 0.95) for key in dic["dic_key_speed"].keys()])
     keys = [key for key in dic["dic_key_speed"].keys()]
-    indices_keys = np.argsort(-speeds_keys)
-    print("Keys typed most slowly ({} / {} keystrokes removed as outliers): ".format(n_outliers_keys, n_keys_typed))
+    indices_keys = np.argsort(-mean_speeds_keys)
+    print("Keys typed most slowly :")
+    printset = set(string.printable) # set of printable characters
     for i in indices_keys[:n]:
-        print(u"Key: {}  ({} ms +- {})".format(keys[i], int(1000 * speeds_keys[i]), int(2 * 1000 * std_speeds_keys[i]))) #gaussian approx of 95 interval
+        if set(keys[i]).issubset(printset): # if the key is printable
+            print(u"Key: {}  Mean time: {} ms, [{}, {}] 90%, Typed {} times".format(keys[i],
+                                                                                    int(1000 * mean_speeds_keys[i]),
+                                                                                    int(1000 * q5_speeds_keys[i]),
+                                                                                    int(1000 * q95_speeds_keys[i]),
+                                                                                    len(dic["dic_key_speed"][keys[i]])))
+        else:
+            print(u"Key: {}  Mean time: {} ms, [{}, {}] 90%, Typed {} times, Repr : {}".format(keys[i],
+                                                                                   int(1000 * mean_speeds_keys[i]),
+                                                                                    int(1000 * q5_speeds_keys[i]),
+                                                                                    int(1000 * q95_speeds_keys[i]),
+                                                                                    len(dic["dic_key_speed"][keys[i]]),
+                                                                                    repr(keys[i])))
+
     print
 
     ############
@@ -182,7 +212,7 @@ def update_dic(dic, text, keys, times):
     dic["l_inversion"].extend(l_inversion_new)
     dic["n_unnecessary"] += n_unnecessary_new
 
-    dic = key_speeds(keys, times, dic, remove_outliers=True)
+    dic = update_key_speeds(keys, times, dic, remove_outliers=True)
 
 
     return dic
@@ -264,7 +294,7 @@ def count_keys(s, dic):
 
     return dic
 
-def key_speeds(keys, times, dic, remove_outliers=True):
+def update_key_speeds(keys, times, dic, remove_outliers=True):
     #TODO test
     #TODO what about <[Backspace]x2>
     #TODO : what about repeated char (when I leave my finger on the keys)
@@ -299,6 +329,8 @@ def remove_outliers(dic):
             dic[key] = times_without_outliers
 
     return dic, n_outliers
+
+
 
 
 if __name__ == """__main__""":
