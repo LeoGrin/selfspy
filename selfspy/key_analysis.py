@@ -129,7 +129,13 @@ def display_typing_quality(dic, n=25):
     dic["dic_key_speed"], n_outliers_keys = remove_outliers(dic["dic_key_speed"]) # outliers detection
     all_keys_speeds = np.concatenate([ar for ar in dic["dic_key_speed"].values()])
     print("{} / {} keystrokes removed as outliers".format(n_outliers_keys, n_keys_typed_with_outliers))
-    print("Mean time to type a key : {} ms [{}, {}] 90%".format(int(1000 * np.mean(all_keys_speeds)), int(1000 * np.quantile(all_keys_speeds, 0.05)), int(1000 * np.quantile(all_keys_speeds, 0.95)))) #gaussian approx of 95 interval
+    print("Mean time to type a key : {} ms [{}, {}] 90%".format(int(1000 * np.mean(all_keys_speeds)), int(1000 * np.quantile(all_keys_speeds, 0.05)), int(1000 * np.quantile(all_keys_speeds, 0.95))))
+    print
+    n_words_typed_with_outliers = len(dic["word_times"])
+    placeholder_dic, n_outliers_words = remove_outliers({"placeholder": dic["word_times"]}) # remove_outliers requires a dic
+    dic["word_times"] = placeholder_dic["placeholder"] #convert back to list #TODO make it more elegant
+    print("{} / {} words removed as outliers".format(n_outliers_words, n_words_typed_with_outliers))
+    print("Mean time to type a word : {} ms [{}, {}] 90%".format(int(1000 * np.mean(dic["word_times"])), int(1000 * np.quantile(dic["word_times"], 0.05)), int(1000 * np.quantile(dic["word_times"], 0.95))))
     print
     #TODO show speed by word
     #TODO show metric
@@ -190,7 +196,7 @@ def create_dic():
      selfstats code intact.
     :return: the created dictionnary
     """
-    dic = {"l_deleted": [], "l_correct": [], "l_coupled": [], "l_inversion": [], "n_unnecessary": 0, "dic_char_count": {}, "dic_key_speed": {}, "dic_cmd_speed": {}}
+    dic = {"l_deleted": [], "l_correct": [], "l_coupled": [], "l_inversion": [], "n_unnecessary": 0, "dic_char_count": {}, "dic_key_speed": {}, "dic_cmd_speed": {}, "word_times":[]}
 
     return dic
 
@@ -212,7 +218,8 @@ def update_dic(dic, text, keys, times):
     dic["l_inversion"].extend(l_inversion_new)
     dic["n_unnecessary"] += n_unnecessary_new
 
-    dic = update_key_speeds(keys, times, dic, remove_outliers=True)
+    dic = update_key_speeds(keys, times, dic)
+    dic = update_word_speeds(keys, times, dic)
 
 
     return dic
@@ -294,23 +301,57 @@ def count_keys(s, dic):
 
     return dic
 
-def update_key_speeds(keys, times, dic, remove_outliers=True):
+def delimits_words(key, current_word):
+    char_delimitors = [" ", "(", ")", "_", ",", ".", ";", "/", ":", "\n", "\r", "\t"] # TODO check no others ?
+    if key in char_delimitors:
+        return True
+    if key[:2] == "<[": # cmd delimit words excpect backspace when not all the current word is erased
+        backspace_match = re.findall("\<\[Backspace\]x?(\d*)\>", key) #"" if one backspace, "n" if n backspaces
+        if len(backspace_match):
+            if (len(backspace_match[0]) and int(backspace_match[0]) < len(current_word)) or (not len(backspace_match[0]) and len(current_word) > 1): # check that the number of backspace is < to the length of the word
+                return False
+            else:
+                return True
+        return True
+    return False
+
+def update_word_speeds(keys, times, dic):
+    #TODO : there is redundant work on chars and on keys, e.g to determine if a backspace erase some letters or the whole word
+    current_word_time = 0
+    current_word = ""
+    #print(re.split("\W+", "".join(keys))) # maybe another way to separate words? (but what about _ etc)
+    for i, key in enumerate(keys):
+        # check if the word is over
+        if delimits_words(key, current_word):
+            if len(current_word) > 1:
+                current_word_time += times[i]
+                current_word += key
+                dic["word_times"].append(current_word_time)
+                current_word_time = 0
+                current_word = ""
+        else:
+            current_word_time += times[i]
+            current_word += key
+    return dic
+
+def update_key_speeds(keys, times, dic):
     #TODO test
     #TODO what about <[Backspace]x2>
     #TODO : what about repeated char (when I leave my finger on the keys)
     #TODO : combine speed with correctness (if you want to type g but you type f<[Backspace]>g you should count the time to type the three keys for g)
+
     for i, key in enumerate(keys):
         if (i > 1 and keys[i-1][:2] != "<["): #we don't count the time when the key is typed after a command (cause there is probably reflexion involved)
-            if key[:2] == "<[": #if it's a command:
-                if key not in dic["dic_cmd_speed"].keys():
-                    dic["dic_cmd_speed"][key] = [times[i]]
-                else:
-                    dic["dic_cmd_speed"][key].append(times[i])
-            else:
+            if key[:2] != "<[": #if it's not a command:
                 if key not in dic["dic_key_speed"].keys():
                     dic["dic_key_speed"][key] = [times[i]]
                 else:
                     dic["dic_key_speed"][key].append(times[i])
+            else:
+                if key not in dic["dic_cmd_speed"].keys():
+                    dic["dic_cmd_speed"][key] = [times[i]]
+                else:
+                    dic["dic_cmd_speed"][key].append(times[i])
     return dic
 
 def remove_outliers(dic):
